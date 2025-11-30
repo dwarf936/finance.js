@@ -38,6 +38,22 @@ describe('FinanceJS', function() {
     (irr).should.be.within(4951, 4952);
   });
 
+  it('should compute IRR with user-provided cash flow (matches Excel)', function() {
+    var cashFlow = [-206136.99, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 18993.21];
+    var data = {
+      depth : 1500,
+      cashFlow : cashFlow
+    };
+    var monthlyIRR = cal.IRR(data);
+    // Excel returns monthly IRR of ~0.71414%
+    (monthlyIRR).should.be.closeTo(0.71414, 0.00001);
+    
+    // Annualize IRR
+    var annualIRR = (Math.pow(1 + monthlyIRR / 100, 12) - 1) * 100;
+    // Excel returns annual IRR of ~8.91443%
+    (annualIRR).should.be.closeTo(8.91443, 0.00005);
+  });
+
   it('should compute PP for even cash flows', function() {
     cal.PP(0, -105, 25).should.equal(4.2);
   });
