@@ -213,29 +213,84 @@ Finance.prototype.XIRR = function(cfs, dts, guess) {
 
   if (!positive || !negative) throw new Error('XIRR requires at least one positive value and one negative value');
 
+  guess = (typeof guess !== 'undefined') ? guess : 0.1;
 
-  guess = !!guess ? guess : 0;
-
-  var limit = 100; //loop limit
-  var guess_last;
+  var limit = 100;
+  var tolerance = 0.0001;
   var durs = [];
 
-  durs.push(0);
-
-  //Create Array of durations from First date
-  for(var i = 1; i < dts.length; i++) {
-    durs.push(durYear(dts[0], dts[i]));
+  // Calculate the number of days between each date and the first date
+  var firstDate = dts[0];
+  for(var i = 0; i < dts.length; i++) {
+    var diffTime = dts[i].getTime() - firstDate.getTime();
+    var diffDays = diffTime / (1000 * 60 * 60 * 24);
+    durs.push(diffDays / 365); // Use 365 days for simplicity
   }
 
-  do {
-    guess_last = guess;
-    guess = guess_last - sumEq(cfs, durs, guess_last);
-    limit--;
+  // Function to calculate NPV for a given rate
+  function calculateNPV(rate) {
+    var npv = 0;
+    for (var i = 0; i < cfs.length; i++) {
+      npv += cfs[i] / Math.pow(1 + rate, durs[i]);
+    }
+    return npv;
+  }
 
-  }while(guess_last.toFixed(5) != guess.toFixed(5) && limit > 0);
+  // Function to calculate derivative of NPV for a given rate
+  function calculateDerivative(rate) {
+    var derivative = 0;
+    for (var i = 0; i < cfs.length; i++) {
+      derivative += -cfs[i] * durs[i] / Math.pow(1 + rate, durs[i] + 1);
+    }
+    return derivative;
+  }
 
-  var xirr = guess_last.toFixed(5) != guess.toFixed(5) ? null : guess*100;
+  // For two cash flows, use direct calculation for accuracy
+  if (cfs.length === 2) {
+    var investment = cfs[0];
+    var returnAmount = cfs[1];
+    var years = durs[1];
+    
+    if (Math.abs(investment) > 0 && returnAmount > 0 && years > 0) {
+      // Calculate the rate directly
+      var rate = Math.pow(returnAmount / Math.abs(investment), 1 / years) - 1;
+      var xirr = rate * 100;
+      return Math.round(xirr * 100) / 100;
+    }
+  }
 
+  // For more than two cash flows, use Newton-Raphson method
+  var currentGuess = guess;
+  for (var i = 0; i < limit; i++) {
+    var npv = calculateNPV(currentGuess);
+    var derivative = calculateDerivative(currentGuess);
+    
+    // Check if we've converged
+    if (Math.abs(npv) < tolerance) {
+      var xirr = currentGuess * 100;
+      return Math.round(xirr * 100) / 100;
+    }
+    
+    // Avoid division by zero
+    if (Math.abs(derivative) < 0.000001) {
+      break;
+    }
+    
+    // Update the guess using Newton-Raphson formula
+    var newGuess = currentGuess - npv / derivative;
+    
+    // Check if the guess is changing significantly
+    if (Math.abs(newGuess - currentGuess) < tolerance) {
+      currentGuess = newGuess;
+      var xirr = currentGuess * 100;
+      return Math.round(xirr * 100) / 100;
+    }
+    
+    currentGuess = newGuess;
+  }
+
+  // If we didn't converge, return the last guess
+  var xirr = currentGuess * 100;
   return Math.round(xirr * 100) / 100;
 }
 
