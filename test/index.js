@@ -38,6 +38,17 @@ describe('FinanceJS', function() {
     (irr).should.be.within(4951, 4952);
   });
 
+  it('should compute IRR accurately matching Excel', function() {
+    var cashFlow = [-206136.99, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 8993.21, 18993.21];
+    var data = {
+      depth : 1500,
+      cashFlow : cashFlow
+    };
+    var irr = cal.IRR(data);
+    // Excel result is approximately 0.71414%
+    (irr).should.be.within(0.7141, 0.7142);
+  });
+
   it('should compute PP for even cash flows', function() {
     cal.PP(0, -105, 25).should.equal(4.2);
   });

@@ -29,23 +29,43 @@ Finance.prototype.NPV = function (rate) {
   return Math.round(npv * 100) / 100;
 };
 
-// seekZero seeks the zero point of the function fn(x), accurate to within x \pm 0.01. fn(x) must be decreasing with x.
-function seekZero(fn) {
-  var x = 1;
-  while (fn(x) > 0) {
-    x += 1;
+// seekZero seeks the zero point of the function fn(x) using the bisection method for higher precision.
+// fn(x) must be continuous and have a sign change in the interval [low, high].
+function seekZero(fn, low, high, precision) {
+  var mid, fmid, flow = fn(low), fhigh = fn(high);
+  
+  // Check if there's a sign change in the interval
+  if (flow * fhigh >= 0) {
+    throw new Error('No sign change in the interval, cannot find zero');
   }
-  while (fn(x) < 0) {
-    x -= 0.01
+  
+  while ((high - low) > precision) {
+    mid = (low + high) / 2;
+    fmid = fn(mid);
+    
+    if (fmid === 0) {
+      // Exact zero found
+      return mid;
+    } else if (flow * fmid < 0) {
+      // Zero is in the lower half
+      high = mid;
+      fhigh = fmid;
+    } else {
+      // Zero is in the upper half
+      low = mid;
+      flow = fmid;
+    }
   }
-  return x + 0.01;
+  
+  // Return the midpoint of the final interval as the approximation
+  return (low + high) / 2;
 }
 
 // Internal Rate of Return (IRR)
 Finance.prototype.IRR = function(cfs) {
-  var depth = cfs.depth;
+  var depth = cfs.depth || 1000;
   var args = cfs.cashFlow;
-  var numberOfTries = 1;
+  var numberOfTries = 0;
   // Cash flow values must contain at least one positive value and one negative value
   var positive, negative;
   Array.prototype.slice.call(args).forEach(function (value) {
@@ -53,6 +73,7 @@ Finance.prototype.IRR = function(cfs) {
     if (value < 0) negative = true;
   })
   if (!positive || !negative) throw new Error('IRR requires at least one positive value and one negative value');
+  
   function npv(rate) {
     numberOfTries++;
     if (numberOfTries > depth) {
@@ -65,7 +86,40 @@ Finance.prototype.IRR = function(cfs) {
     }
     return npv;
   }
-  return Math.round(seekZero(npv) * 100) / 100;
+  
+  // Find an initial interval that contains the zero
+  var low = -100; // Start with a low rate of -100%
+  var high = 100; // Start with a high rate of 100%
+  var fhigh = npv(high);
+  
+  // If fhigh is positive, we need to increase the high rate until fhigh becomes negative
+  // This handles cases with very high IRR
+  while (fhigh > 0 && high < 10000) {
+    high += 100; // Increase by larger increments for very high IRR
+    fhigh = npv(high);
+  }
+  
+  // If we still haven't found a negative fhigh, try a different approach
+  // Start with a very high rate and work our way down
+  if (fhigh > 0) {
+    high = 10000; // Set to a very high rate
+    fhigh = npv(high);
+    
+    // If it's still positive, the IRR is extremely high or doesn't exist
+    if (fhigh > 0) {
+      // Try to find a rate where fhigh becomes negative by doubling the rate
+      while (fhigh > 0 && high < 1000000) {
+        high *= 2;
+        fhigh = npv(high);
+      }
+    }
+  }
+  
+  // Use bisection method with high precision (0.00001%)
+  var irr = seekZero(npv, low, high, 0.00001);
+  
+  // Return the result with higher precision (6 decimal places)
+  return Math.round(irr * 1000000) / 1000000;
 };
 
 // Payback Period (PP)
