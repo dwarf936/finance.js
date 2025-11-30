@@ -214,7 +214,7 @@ Finance.prototype.XIRR = function(cfs, dts, guess) {
   if (!positive || !negative) throw new Error('XIRR requires at least one positive value and one negative value');
 
 
-  guess = !!guess ? guess : 0;
+  guess = !!guess ? guess : 0.1; // 使用0.1作为默认猜测值，避免接近-1的情况
 
   var limit = 100; //loop limit
   var guess_last;
@@ -229,12 +229,29 @@ Finance.prototype.XIRR = function(cfs, dts, guess) {
 
   do {
     guess_last = guess;
-    guess = guess_last - sumEq(cfs, durs, guess_last);
+    var fx = 0;
+    var fdx = 0;
+    for (var i = 0; i < cfs.length; i++) {
+      var factor = Math.pow(1 + guess_last, durs[i]);
+      fx += cfs[i] / factor;
+      fdx -= cfs[i] * durs[i] / (factor * (1 + guess_last));
+    }
+    // 避免除以零或非常小的数
+    if (Math.abs(fdx) < 1e-10) {
+      break;
+    }
+    guess = guess_last - fx / fdx;
+    // 限制guess的范围，避免无限增长或接近-1
+    if (guess < -0.999999) {
+      guess = -0.999999;
+    } else if (guess > 10) {
+      guess = 10;
+    }
     limit--;
 
-  }while(guess_last.toFixed(5) != guess.toFixed(5) && limit > 0);
+  }while(Math.abs(guess_last - guess) > 1e-8 && limit > 0);
 
-  var xirr = guess_last.toFixed(5) != guess.toFixed(5) ? null : guess*100;
+  var xirr = (Math.abs(guess_last - guess) <= 1e-8) ? guess*100 : null;
 
   return Math.round(xirr * 100) / 100;
 }

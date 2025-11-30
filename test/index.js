@@ -123,6 +123,38 @@ describe('FinanceJS', function() {
   it('should compute XIRR', function() {
     cal.XIRR([-1000, -100, 1200],[new Date(2015, 11, 1 ), new Date(2016, 7, 1 ), new Date(2016, 7, 19 )],0 ).should.equal(14.11);
   });
+
+  it('should compute XIRR for the provided example', function() {
+    var start = new Date(Date.parse("2013-12-31"));
+    var end = new Date(Date.parse("2014-05-15"));
+    var irr = cal.XIRR([-37987348, 21191041], [start, end], 0);
+    // 预期结果应该是-79.36
+    irr.should.equal(-79.36);
+  });
+
+  it('should compute XIRR for positive return example', function() {
+    var dates = [new Date(2020, 0, 1), new Date(2020, 11, 31)];
+    var cashFlows = [-10000, 12000];
+    var irr = cal.XIRR(cashFlows, dates);
+    // 预期结果应该是约20%（实际计算为20.00%）
+    irr.should.equal(20.00);
+  });
+
+  it('should compute XIRR for multiple cash flows', function() {
+    var dates = [new Date(2020, 0, 1), new Date(2020, 3, 1), new Date(2020, 6, 1), new Date(2020, 9, 1), new Date(2020, 11, 31)];
+    var cashFlows = [-5000, 1000, 1500, 2000, 2500];
+    var irr = cal.XIRR(cashFlows, dates);
+    // 预期结果应该是约62.07%（实际计算为62.07%）
+    irr.should.equal(62.07);
+  });
+
+  it('should compute XIRR for annual cash flows over several years', function() {
+    var dates = [new Date(2018, 0, 1), new Date(2019, 0, 1), new Date(2020, 0, 1), new Date(2021, 0, 1), new Date(2022, 0, 1)];
+    var cashFlows = [-10000, 2000, 3000, 4000, 5000];
+    var irr = cal.XIRR(cashFlows, dates);
+    // 预期结果应该是约12.82%（实际计算为12.82%）
+    irr.should.equal(12.82);
+  });
   it('should compute CAPM', function() {
     cal.CAPM(2, 2, 10).should.equal(0.18);
   });
