@@ -29,23 +29,11 @@ Finance.prototype.NPV = function (rate) {
   return Math.round(npv * 100) / 100;
 };
 
-// seekZero seeks the zero point of the function fn(x), accurate to within x \pm 0.01. fn(x) must be decreasing with x.
-function seekZero(fn) {
-  var x = 1;
-  while (fn(x) > 0) {
-    x += 1;
-  }
-  while (fn(x) < 0) {
-    x -= 0.01
-  }
-  return x + 0.01;
-}
-
 // Internal Rate of Return (IRR)
 Finance.prototype.IRR = function(cfs) {
-  var depth = cfs.depth;
+  var depth = cfs.depth || 1000;
   var args = cfs.cashFlow;
-  var numberOfTries = 1;
+  var numberOfTries = 0;
   // Cash flow values must contain at least one positive value and one negative value
   var positive, negative;
   Array.prototype.slice.call(args).forEach(function (value) {
@@ -53,11 +41,9 @@ Finance.prototype.IRR = function(cfs) {
     if (value < 0) negative = true;
   })
   if (!positive || !negative) throw new Error('IRR requires at least one positive value and one negative value');
+  
+  // Calculate NPV at a given rate
   function npv(rate) {
-    numberOfTries++;
-    if (numberOfTries > depth) {
-      throw new Error('IRR can\'t find a result');
-    }
     var rrate = (1 + rate/100);
     var npv = args[0];
     for (var i = 1; i < args.length; i++) {
@@ -65,7 +51,42 @@ Finance.prototype.IRR = function(cfs) {
     }
     return npv;
   }
-  return Math.round(seekZero(npv) * 100) / 100;
+  
+  // Calculate derivative of NPV at a given rate (for Newton-Raphson method)
+  function npvDerivative(rate) {
+    var rrate = (1 + rate/100);
+    var derivative = 0;
+    for (var i = 1; i < args.length; i++) {
+      derivative -= (i * args[i]) / (Math.pow(rrate, i + 1));
+    }
+    return derivative * (1/100); // Convert from percentage to decimal
+  }
+  
+  // Newton-Raphson method to find IRR
+  var guess = 0; // Initial guess of 0%
+  var tolerance = 1e-10; // High precision tolerance
+  var delta;
+  
+  do {
+    numberOfTries++;
+    if (numberOfTries > depth) {
+      throw new Error('IRR can\'t find a result');
+    }
+    
+    var npvValue = npv(guess);
+    var derivativeValue = npvDerivative(guess);
+    
+    if (Math.abs(derivativeValue) < 1e-15) {
+      // Derivative is too small, try a different approach
+      guess += 0.1;
+      delta = 1;
+    } else {
+      delta = npvValue / derivativeValue;
+      guess -= delta;
+    }
+  } while (Math.abs(delta) > tolerance);
+  
+  return guess;
 };
 
 // Payback Period (PP)
